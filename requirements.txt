@@ -1,0 +1,6 @@
+# Runtime
+playwright>=1.40
+pyperclip>=1.8
+
+# Dev / tests
+pytest>=7.0
