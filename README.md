@@ -70,7 +70,7 @@ pts = bezier_path(0, 0, 400, 300, rng=random.Random(7),
 
 ## Testing
 
-The suite (19 tests) proves the behavioral contracts, not just that code runs:
+The suite (22 tests) proves the behavioral contracts, not just that code runs:
 
 - inertial scroll steps **sum to the requested delta** (parametrized: 50–2000px),
   per-step cap respected, tiny deltas rejected (<5px)
@@ -79,6 +79,8 @@ The suite (19 tests) proves the behavioral contracts, not just that code runs:
 - click after auto-scroll uses a **fresh bounding box** (no stale-coordinate clicks)
 - focus check returns **within a ~2s budget** and caches success for 3s
 - Fitts offsets stay inside the element bounds; Bezier paths are seed-deterministic
+- the OS cursor stays **1:1 bound to the virtual one across DPI scales** (calibrated
+  CSS→screen scale + window offset, verified for 100–200% displays)
 
 ```bash
 pip install pytest
