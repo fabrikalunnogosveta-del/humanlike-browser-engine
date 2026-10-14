@@ -281,3 +281,61 @@ def test_bezier_same_seed_same_path():
     c = bezier_mouse.bezier_path(10, 10, 400, 300, rng=random.Random(99), **kw)
     assert a == b
     assert a != c
+
+
+# ── cursor_state: CSS -> OS mapping (DPI) ──────────────────────────────────
+
+def test_detect_scale_identity_and_dpi():
+    import cursor_state
+    assert cursor_state._detect_scale(1920, 1920) == 1.0   # 100% / unaware
+    assert cursor_state._detect_scale(2880, 1920) == 1.5   # 150% aware
+    assert cursor_state._detect_scale(0, 1920) == 1.0      # no OS info
+    assert cursor_state._detect_scale(1920, 0) == 1.0      # no CSS info
+
+
+def test_css_to_os_applies_scale_offset_and_rounding():
+    import cursor_state
+    old = (cursor_state._scale,
+           cursor_state._window_offset_x, cursor_state._window_offset_y)
+    try:
+        cursor_state._scale = 1.0
+        cursor_state._window_offset_x = 0
+        cursor_state._window_offset_y = 0
+        assert cursor_state._css_to_os(100.4, 200.6) == (100, 201)
+
+        cursor_state._scale = 1.25
+        cursor_state._window_offset_x = 32
+        cursor_state._window_offset_y = 40
+        assert cursor_state._css_to_os(100, 200) == (157, 290)
+
+        cursor_state._scale = 1.0
+        cursor_state._window_offset_x = -10
+        cursor_state._window_offset_y = 0
+        assert cursor_state._css_to_os(5, 5) == (-5, 5)
+    finally:
+        (cursor_state._scale,
+         cursor_state._window_offset_x,
+         cursor_state._window_offset_y) = old
+
+
+def test_calibrate_uses_screen_width_ratio():
+    import cursor_state
+
+    class _FakePage:
+        def evaluate(self, _js):
+            return [32, 64, 1920]  # screenX, screenY, CSS screen width
+
+    old = (cursor_state._scale,
+           cursor_state._window_offset_x, cursor_state._window_offset_y,
+           cursor_state._GetSystemMetrics)
+    try:
+        cursor_state._GetSystemMetrics = lambda _idx: 2880  # aware @150%
+        cursor_state.calibrate_window_offset(_FakePage())
+        assert cursor_state._scale == 1.5
+        assert cursor_state._window_offset_x == 48   # 32 * 1.5
+        assert cursor_state._window_offset_y == 96   # 64 * 1.5
+    finally:
+        (cursor_state._scale,
+         cursor_state._window_offset_x,
+         cursor_state._window_offset_y,
+         cursor_state._GetSystemMetrics) = old

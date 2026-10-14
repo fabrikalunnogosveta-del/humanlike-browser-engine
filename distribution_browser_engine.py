@@ -289,7 +289,7 @@ def _is_accept_button_type(btn: dict) -> bool:
 class BrowserClosedError(Exception):
     """Браузер закрыт — неустранимая ошибка, требуется перезапуск сессии."""
     pass
-from cursor_state import get as _cursor_get, set as _cursor_set, is_init as _cursor_is_init, init_from_viewport as _cursor_init
+from cursor_state import get as _cursor_get, set as _cursor_set, is_init as _cursor_is_init, init_from_viewport as _cursor_init, calibrate_window_offset as _cursor_calibrate
 _cursor_x = 600.0
 _cursor_y = 400.0
 
@@ -306,6 +306,7 @@ def _ensure_cursor_state(page, rng) -> None:
     try:
         vw = page.evaluate("() => window.innerWidth") or 1280
         vh = page.evaluate("() => window.innerHeight") or 720
+        _cursor_calibrate(page)  # DPI/offset: первый set() должен знать масштаб
         init_x = vw * (0.5 if rng is None else rng.uniform(0.4, 0.6))
         init_y = vh * (0.5 if rng is None else rng.uniform(0.4, 0.6))
         _cursor_set(init_x, init_y)

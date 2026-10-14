@@ -2,7 +2,10 @@
 Shared cursor-position state for all humanization primitives.
 
 Single source of truth for the virtual cursor. Invariants:
-1. virtual(x,y) + window_offset(screenX, screenY) = OS cursor position.
+1. virtual(x,y) * scale + window_offset(screenX, screenY) = OS cursor position.
+   `scale` = (OS screen width in OUR process units) / (CSS screen width) —
+   it absorbs both DPI scaling (125/150%) and the process DPI-awareness mode,
+   so CSS px and SetCursorPos px always land on the same physical point.
 2. NEVER start a Bezier path from (0,0).
 3. The OS cursor tracks every Bezier step 1:1 — no drift between
    the stored state and the real pointer.
@@ -24,15 +27,32 @@ _initialized: bool = False
 _lock = threading.Lock()
 _window_offset_x: int = 0
 _window_offset_y: int = 0
+_scale: float = 1.0
 
 # Windows API (optional — on other OSes the OS-cursor sync is skipped)
 _SetCursorPos = None
+_GetSystemMetrics = None
 try:
     _user32 = ctypes.windll.user32
     _SetCursorPos = _user32.SetCursorPos
     _SetCursorPos.argtypes = [ctypes.c_int, ctypes.c_int]
+    _GetSystemMetrics = _user32.GetSystemMetrics
 except (AttributeError, OSError, ValueError):
     pass
+
+
+def _detect_scale(screen_w_os: float, screen_w_css: float) -> float:
+    """CSS px -> our-process screen px factor (1.0 when spaces coincide)."""
+    if screen_w_os and screen_w_css and screen_w_os > 0 and screen_w_css > 0:
+        return float(screen_w_os) / float(screen_w_css)
+    return 1.0
+
+
+def _css_to_os(x: float, y: float) -> tuple:
+    """Viewport CSS px -> OS screen px for SetCursorPos."""
+    return (int(round(x * _scale + _window_offset_x)),
+            int(round(y * _scale + _window_offset_y)))
+
 
 
 def get() -> tuple:
@@ -47,19 +67,26 @@ def set(x: float, y: float) -> None:
         _cursor_x = float(x)
         _cursor_y = float(y)
         _initialized = True
-    # OS-курсор = viewport координаты + смещение окна браузера
+    # OS-курсор = viewport координаты, приведённые к экранным единицам
     try:
         if _SetCursorPos is not None:
-            _SetCursorPos(int(x) + _window_offset_x, int(y) + _window_offset_y)
+            _SetCursorPos(*_css_to_os(x, y))
     except Exception as _err:        _swallow_err("cursor_state", _err)
 def calibrate_window_offset(page) -> None:
-    """Вычислить смещение окна браузера от экрана через window.screenX/Y."""
-    global _window_offset_x, _window_offset_y
+    """Калибровка: scale (CSS→OS, DPI) + смещение окна через screenX/Y."""
+    global _window_offset_x, _window_offset_y, _scale
     try:
-        off = page.evaluate("() => [window.screenX || 0, window.screenY || 0]")
-        if off and len(off) >= 2:
-            _window_offset_x = int(off[0])
-            _window_offset_y = int(off[1])
+        off = page.evaluate(
+            "() => [window.screenX || 0, window.screenY || 0,"
+            " window.screen.width || 0]"
+        )
+        sm_w = 0
+        if _GetSystemMetrics is not None:
+            sm_w = int(_GetSystemMetrics(0))  # SM_CXSCREEN в наших единицах
+        css_w = float(off[2]) if off and len(off) >= 3 else 0.0
+        _scale = _detect_scale(sm_w, css_w)
+        _window_offset_x = int(round(float(off[0]) * _scale))
+        _window_offset_y = int(round(float(off[1]) * _scale))
     except Exception as _err:        _swallow_err("cursor_state", _err)
 def is_init() -> bool:
     """Был ли курсор уже инициализирован."""
@@ -69,6 +96,7 @@ def is_init() -> bool:
 def init_from_viewport(page, rng=None) -> tuple:
     """Инициализировать позицию из центра viewport + jitter. + OS-курсор."""
     global _cursor_x, _cursor_y, _initialized
+    calibrate_window_offset(page)
     if _initialized:
         return (_cursor_x, _cursor_y)
     import random as _random
@@ -86,6 +114,6 @@ def init_from_viewport(page, rng=None) -> tuple:
         _initialized = True
     try:
         if _SetCursorPos is not None:
-            _SetCursorPos(int(x), int(y))
+            _SetCursorPos(*_css_to_os(x, y))
     except Exception as _err:        _swallow_err("cursor_state", _err)
     return (_cursor_x, _cursor_y)
