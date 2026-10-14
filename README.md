@@ -10,6 +10,14 @@ bursts shaped by muscle memory. This library turns raw Playwright-style input ca
 those natural patterns — useful for UI testing, accessibility automation, and any
 workflow where input should look and feel human.
 
+## Demo
+
+Real screen recording of one uninterrupted run (real OS cursor: Bezier fly-in →
+Fitts click → inertial scroll → burst typing).
+
+To re-record it yourself: `pip install mss pillow` then
+`python examples/record_demo.py` (keeps your hands off the mouse for ~30s).
+
 ## Why
 
 Constant-speed cursors and uniform delays are trivially distinguishable from real user
