@@ -18,7 +18,7 @@ those natural patterns.
 
 | Problem (before) | Solution (this library) |
 |---|---|
-| Straight-line mouse = bot fingerprint | Cubic Bezier arcs + tremor |
+| Straight-line mouse = bot signature | Cubic Bezier arcs + tremor |
 | Uniform 100ms delays = robotic | Lognormal latencies, 60Hz-quantized |
 | Scroll «almost 600px» | **Exact-delta** inertial delivery (sums to requested px) |
 | Perfect typing = unnatural | Burst + typos + backspace + muscle memory |

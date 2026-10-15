@@ -112,7 +112,7 @@ def bezier_path(x1, y1, x2, y2, rng=None, profile=None, steps: int = None,
         return [(x2, y2)]
 
     nx, ny = -(y2 - y1) / dist, (x2 - x1) / dist
-    # Power-law bow magnitude — human fingerprint vs plain Gaussian
+    # Power-law bow magnitude — human motion signature vs plain Gaussian
     bow_mag = deviation * 3
     bow = r.uniform(-1, 1) * min(bow_mag, dist * 0.25)
 
