@@ -14,10 +14,20 @@ those natural patterns.
 
 ---
 
-## Why this exists
+## The problem we solved
 
-Constant-speed cursors and uniform delays are trivially distinguishable from real user
-input by trajectory analysis:
+| Problem (before) | Solution (this library) |
+|---|---|
+| Straight-line mouse = bot fingerprint | Cubic Bezier arcs + tremor |
+| Uniform 100ms delays = robotic | Lognormal latencies, 60Hz-quantized |
+| Scroll «almost 600px» | **Exact-delta** inertial delivery (sums to requested px) |
+| Perfect typing = unnatural | Burst + typos + backspace + muscle memory |
+| Wrong click on HiDPI displays | **DPI-aware CSS→OS cursor binding** |
+| Unreproducible demos/tests | **Seeded RNG** — same seed, same trajectory |
+
+**Bot-like input is trivially detectable.** This library models real human motor control.
+
+### Bot-like vs human
 
 | Bot-like input | This library |
 |---|---|
