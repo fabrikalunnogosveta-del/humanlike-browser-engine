@@ -2,10 +2,11 @@
 
     python examples/record_demo.py
 
-Launches a headed Chromium in fullscreen, drives the REAL OS cursor
-(Bezier move -> Fitts click -> inertial scroll -> burst typing) while an
-mss thread captures the screen. Keep your hands off the mouse while it runs.
-Needs: playwright, mss, pillow.
+Launches a headed Chromium, drives the REAL OS cursor (Bezier move -> Fitts
+click -> inertial scroll -> burst typing) while an mss thread captures
+EXACTLY the browser window rect (screenX/Y * devicePixelRatio) — the desktop
+and other windows are never in frame. Keep your hands off the mouse while it
+runs. Needs: playwright, mss, pillow.
 """
 import random
 import sys
@@ -67,11 +68,11 @@ document.getElementById('go').addEventListener('click', function () {{
 
 
 class Recorder(threading.Thread):
-    """Capture the primary monitor at FPS until stopped."""
+    """Capture the given screen region (browser window only) at FPS."""
 
-    def __init__(self, monitor):
+    def __init__(self, region):
         super().__init__(daemon=True)
-        self.monitor = monitor
+        self.region = region  # {left, top, width, height} in physical px
         self.frames = []
         self.stop_evt = threading.Event()
 
@@ -79,10 +80,10 @@ class Recorder(threading.Thread):
         import mss
 
         period = 1.0 / FPS
-        with mss.mss() as sct:
+        with mss.MSS() as sct:
             while not self.stop_evt.is_set():
                 t0 = time.perf_counter()
-                shot = sct.grab(self.monitor)
+                shot = sct.grab(self.region)
                 img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
                 h = max(1, int(OUT_W * shot.size[1] / shot.size[0]))
                 self.frames.append(img.resize((OUT_W, h), Image.LANCZOS))
@@ -96,18 +97,25 @@ def _box(page, selector):
 
 def main():
     rng = random.Random(11)
-    import mss
     from playwright.sync_api import sync_playwright
 
-    monitor = mss.mss().monitors[1]
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, args=["--start-fullscreen"])
+        browser = p.chromium.launch(headless=False, args=["--start-maximized"])
         page = browser.new_page()
         page.set_content(PAGE)
         page.bring_to_front()
         time.sleep(0.8)
 
-        rec = Recorder(monitor)
+        # capture ONLY the browser window: CSS rect * devicePixelRatio = px
+        left, top, w, h = page.evaluate(
+            "() => { const d = window.devicePixelRatio || 1;"
+            " return [Math.max(0, Math.round(window.screenX * d)),"
+            " Math.max(0, Math.round(window.screenY * d)),"
+            " Math.round(window.outerWidth * d),"
+            " Math.round(window.outerHeight * d)]; }"
+        )
+        rec = Recorder({"left": left, "top": top,
+                        "width": w, "height": h})
         rec.start()
         time.sleep(0.3)
         try:
